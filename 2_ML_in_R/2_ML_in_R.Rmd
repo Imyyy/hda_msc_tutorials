@@ -18,7 +18,6 @@ The goal of this tutorial is to introduce a typical workflow in carrying out ML 
 3. visualising the data,
 4.  a) creating training, b) test datasets and c) learning a model using them and evaluating its performance.
 
-
 # 1) Load Data
 
 We load the same iris dataset as last week, which has 150 samples and 4 attributes. There are 3 classes (species).
@@ -42,14 +41,23 @@ Suggestion: use the the `group_by` and `summarise_all` functions from the `dplyr
 library(dplyr)
 
 # Calculate the mean of each attribute
+iris %>% group_by(Species)%>% 
+  summarise_if(is.numeric, mean)
 
 # Calculate the standard deviation of each attribute
+iris %>% group_by(Species) %>% 
+  summarise_if(is.numeric, sd)
 
 # Calculate the minimum of each attribute
+iris %>% group_by(Species) %>% 
+  summarise_if(is.numeric, min)
 
 # Calculate the maximum of each attribute
-
+iris %>% group_by(Species) %>% 
+  summarise_if(is.numeric, max)
 ```
+Alternative input into the summarise function is summarise_all(list(mean))
+
 
 # 3) Visualise the dataset
 
@@ -57,52 +65,60 @@ Make some exploratory plots here.
 
 Suggestion: use the `ggplot2` library. For a nice pairs plot use the `ggpairs` function from `GGally` (a `ggplot2` extension library).
 
-```{r message=FALSE}
+```{r EDA, message=FALSE}
 library(ggplot2)
 library(GGally)
+ggpairs(iris, aes(color = Species, alpha = 0.5), progress=FALSE)
+  #alpha = 0.5 needed so you can see the multiple plots
 ```
+Plot shows that it should be relatively easy to classify, as the dots group themselves quite clearly.
 
 # 4) Classification using Least Squares
 
 Here we will be carrying out classification using the least squares formulation on 2 classes of the dataset.
 
-### a) Create separate datasets for the classes `setosa` and `versicolor`.
+a) Create separate datasets for the classes `setosa` and `versicolor`.
 
 ```{r}
 # your code here
 
 # result should be two dataframes (one for each for setosa, versicolor classes),
 # each with dim (50,5) - 4 attributes plus column for class
-stopifnot(all(dim(setosa)==c(50,5)))
-stopifnot(all(dim(versicolor)==c(50,5)))
+#stopifnot(all(dim(setosa)==c(50,5)))
+#stopifnot(all(dim(versicolor)==c(50,5)))
 ```
+Don't need some of the code here as have done the ifelse statement
 
-
-### b) add a column to each dataset where the column is $1$ if the class is `setosa` and $-1$ otherwise.
+b) add a column to each dataset where the column is $1$ if the class is `setosa` and $-1$ otherwise.
 
 ```{r}
 # your code here
-
+iris$Class <- ifelse(iris$Species == 'setosa', 1, -1)
+irissub <- subset(iris, Species != 'virginica')
 # result should add a column to each of setosa and versicolor
-stopifnot(all(dim(setosa)==c(50,6)))
-stopifnot(all(dim(versicolor)==c(50,6)))
+#stopifnot(all(dim(setosa)==c(50,6))) #Test
+#stopifnot(all(dim(versicolor)==c(50,6))) #Test
 ```
 
 
-### c) create training and test datasets, with 20% of the data for testing. This 80 training points and 20 testing points in total (half this per class).
+c) create training and test datasets, with 20% of the data for testing. This 80 training points and 20 testing points in total (half this per class).
 
 ```{r}
 # your code here
+set.seed(123) # Set Seed so that same sample can be reproduced in future also
+library(caTools)
+# Now Selecting 75% of data as sample from total 'n' rows of the data  
 
+sample <- sample.int(n = nrow(irissub), size = floor(.80*nrow(irissub)), replace = F)
+train <- irissub[sample, ]
+test  <- irissub[-sample, ]
 # resulting dataframes (one each for training and test data) should have
 # the appropriate sizes
-stopifnot(all(dim(training.data)==c(80,6)))
-stopifnot(all(dim(test.data)==c(20,6)))
+#stopifnot(all(dim(training.data)==c(80,6)))
+#stopifnot(all(dim(test.data)==c(20,6)))
 ```
 
-
-
-### d) apply the least squares solution to obtain an optimal solution for different combinations of the 4 available attributes. The code to create a list containing all the combinations of the attributes has been provided.
+d) apply the least squares solution to obtain an optimal solution for different combinations of the 4 available attributes. The code to create a list containing all the combinations of the attributes has been provided.
 
 ```{r}
 # Creates all possible combinations of attributes
@@ -113,35 +129,55 @@ attribute.combinations <- do.call(
   lapply(1:4, function(i) as.list(data.frame(combn(attribute.names, i))))
   )
 names(attribute.combinations) <- 1:length(attribute.combinations)
+```
+This created a list of the 4 attribute names, and then combined them in all possible combinations. 
 
-
+Want to do:
+(transposed train x train)inversed x (transposed train x class)
+```{r}
 return.predictions <- function(attribute.names, training.data, test.data) {
   
   # Format training and test data (as matrices)
   ### your code here
-
+  trainmat <- data.matrix(train[-5])
+  trainx <- trainmat[,1:4]
+  trainy <- trainmat[,5]
+  testmat <- data.matrix(test[-5])
+  testy <- testmat[,1:4]
+  testy <- testmat[,5]
   # Calculate optimal weights
   ### your code here
-  
+  #classifier <- glm(log(iris$Class) ~ iris$Petal.Length*iris$Petal.Width, family="binomial", data = iris)
+  weights <- solve((t(trainx)%*%trainx)) %*% (t(trainx)%*%trainy)
+  weightsmat <- data.matrix(weights)
   # Make predictions
-  ### your code here
-
-  return(predictions)
+  ###
+  predictions <-  trainx %*% weights
+  
+    return(predictions)
 }
 ```
+### Notes
+Classifier algorithm did not work. Trying matrix multiplication instead
+Needs to be a matrix, different to a dataframe in R. 
+Lecturer recommends not using a for loop - much faster when have lots of data.  Didn't do what we did, instead  used sapply on attribute combinations. Can then plot all of the combinations against their weights in a bar plot.  
+Need to compare to the answers in teh complete data. 
 
-
-
-### e) evaluate which input attributes are the best.
+e) evaluate which input attributes are the best.
 
 ```{r}
 # Calculate the mean square error between some predictions and
 # the corresponding testing data
 return.mse <- function(predictions, testing.data) {
-  ### your code here
+  ### your code 
+  rmse(testmaty, predictions)
+  
   return(mse)
 }
 
 # Calculate the test MSE for each the elements of attribute.combinations
 # by calling return.predictions and return.mse
+
+
+
 ```

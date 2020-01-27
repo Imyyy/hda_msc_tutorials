@@ -2,7 +2,7 @@
 
 This tutorial contains exercise to get students familiar with implementing machine learning methods in R.
 
-It follows the same worflow as last week's Python tutorial, but in R.
+It follows the same workflow as last week's Python tutorial, but in R.
 
 In this, students are asked to use the IRIS dataset to gain experience in manipulating data in R dataframes, visualising the data in simple plots, and implementing the closed form solution of linear regression using least squares.
 
